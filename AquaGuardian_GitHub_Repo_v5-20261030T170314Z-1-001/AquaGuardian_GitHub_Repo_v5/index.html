@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AquaGuardian: Deep Clean | UN SDG 6 Game</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Accessibility SVG filter matrix -->
+  <svg id="colorblind-filter" style="display:none;">
+    <defs>
+      <filter id="protanopia-filter">
+        <feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0   0.558, 0.442, 0, 0, 0   0, 0.242, 0.758, 0, 0   0, 0, 0, 1, 0" />
+      </filter>
+      <filter id="deuteranopia-filter">
+        <feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0   0.700, 0.300, 0, 0, 0   0, 0.300, 0.700, 0, 0   0, 0, 0, 1, 0" />
+      </filter>
+      <filter id="tritanopia-filter">
+        <feColorMatrix type="matrix" values="0.950, 0.050, 0, 0, 0   0, 0.433, 0.567, 0, 0   0, 0.475, 0.525, 0, 0   0, 0, 0, 1, 0" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div id="game-container">
+    <!-- Main 2D Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Glassmorphism HUD Overlay -->
+    <div id="ui-layer">
+      <!-- Top HUD Header -->
+      <header class="hud-header">
+        <div class="hud-group">
+          <!-- Central Water Quality Index Meter (Authentic NSF-WQI & Telemetry) -->
+          <div class="wqi-container" style="min-width: 260px;">
+            <div class="wqi-label-row">
+              <span title="National Sanitation Foundation Water Quality Index (0-100 composite standard)">NSF-WQI Score</span>
+              <span id="wqiText">35 / 100 [Poor]</span>
+            </div>
+            <div class="wqi-meter-bg">
+              <div id="wqiFill" class="wqi-meter-fill" style="width: 35%;"></div>
+              <div class="wqi-threshold-marker" title="UN SDG 6 Clean Benchmark: 80 / 100"></div>
+            </div>
+            <div class="wqi-telemetry-row">
+              <span>DO: <b id="telemetryDO">4.3 mg/L</b></span>
+              <span>Turbidity: <b id="telemetryTurb">63 NTU</b></span>
+              <span>pH: <b id="telemetryPH">6.5</b></span>
+            </div>
+          </div>
+
+          <!-- Player Level & XP Progress Bar -->
+          <div class="stat-pill" style="min-width: 140px;">
+            <div class="stat-meta" style="width: 100%;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold;">
+                <span id="playerLvlText" style="color: #ffd600;">LVL 1</span>
+                <span id="playerXpText" style="color: var(--text-muted); font-size: 10px;">0 / 400 XP</span>
+              </div>
+              <div class="mini-bar" style="width: 100%; height: 6px;">
+                <div id="playerXpFill" class="mini-bar-fill" style="background: linear-gradient(90deg, #ffd600, #ff007f); width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-group">
+          <!-- Solar Daylight Status -->
+          <div id="solarStatus" class="solar-indicator">☀️ Daylight (100%)</div>
+
+          <!-- Eco-Karma Meter -->
+          <div class="stat-pill">
+            <span class="stat-icon">🐬</span>
+            <div class="stat-meta">
+              <span class="stat-title">Eco-Karma</span>
+              <span id="karmaText" class="stat-value">100%</span>
+            </div>
+          </div>
+
+          <!-- Eco-Credits Counter -->
+          <div class="stat-pill">
+            <span class="stat-icon">🪙</span>
+            <div class="stat-meta">
+              <span class="stat-title">Eco-Credits</span>
+              <span id="creditsText" class="stat-value">0</span>
+            </div>
+          </div>
+
+          <!-- Level Mission Timer -->
+          <div class="stat-pill">
+            <span class="stat-icon">⏱️</span>
+            <div class="stat-meta">
+              <span class="stat-title">Time</span>
+              <span id="timerText" class="stat-value">00:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Minimap Radar -->
+        <div class="minimap-wrapper">
+          <canvas id="minimapCanvas" width="140" height="140"></canvas>
+          <div class="minimap-compass">N</div>
+        </div>
+      </header>
+
+      <!-- Center Notifications / Combo Streaks / Bounties -->
+      <div class="hud-center-notifications">
+        <div id="tutorialBanner" style="display:none; background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(9, 29, 46, 0.95)); border: 2px solid var(--primary); padding: 10px 24px; border-radius: 20px; box-shadow: 0 0 20px rgba(0,242,254,0.6); max-width: 600px; text-align: center; font-size: 14px; font-weight: bold; color: #fff;"></div>
+        <div id="comboBanner" class="combo-badge" style="display:none;">TRIPLE CLEAN! 🔥</div>
+        <div id="notificationBanner" class="notification-banner" style="display:none;"></div>
+      </div>
+
+      <!-- Left Active Bounties HUD Widget -->
+      <div style="position: absolute; top: 100px; left: 24px; background: var(--bg-surface); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px 14px; pointer-events: auto; max-width: 250px;">
+        <div style="font-size: 11px; font-weight: bold; color: var(--primary); letter-spacing: 0.5px; margin-bottom: 6px; text-transform: uppercase;">⚡ Active Mission Bounties</div>
+        <div id="hudBounties"></div>
+      </div>
+
+      <!-- Bottom HUD Footer -->
+      <footer class="hud-footer">
+        <div class="hud-group">
+          <!-- Solar Battery -->
+          <div class="stat-pill">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-meta">
+              <span class="stat-title">Solar Battery</span>
+              <span id="energyText" class="stat-value">100 / 100</span>
+              <div class="mini-bar">
+                <div id="energyFill" class="mini-bar-fill energy"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cargo Hold -->
+          <div class="stat-pill">
+            <span class="stat-icon">📦</span>
+            <div class="stat-meta">
+              <span class="stat-title">Recycle Cargo Hold</span>
+              <span id="cargoText" class="stat-value">0 / 12</span>
+              <div class="mini-bar">
+                <div id="cargoFill" class="mini-bar-fill cargo" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Skills Bar -->
+        <div class="skills-bar">
+          <div class="skill-card ready" title="Auto-Hover on Barrels or Press E on Pipes">
+            <span class="skill-key">E</span>
+            <span class="skill-icon">🔧</span>
+            <span class="skill-name">Interact</span>
+          </div>
+          <div class="skill-card ready" title="Left-Click or Space to Boost">
+            <span class="skill-key">LMB</span>
+            <span class="skill-icon">🚀</span>
+            <span class="skill-name">Boost</span>
+          </div>
+          <div class="skill-card ready" onclick="if(window.MainGame && window.MainGame.currentLevel && window.MainGame.currentLevel.drone && window.MainGame.currentLevel.drone.sonarCooldown<=0) window.MainGame.currentLevel.drone.triggerSonar();" title="Q or Scroll Up for Sonar Ping Radar">
+            <span class="skill-key">Q</span>
+            <span class="skill-icon">📡</span>
+            <span class="skill-name">Sonar</span>
+            <div id="cdSonar" class="cooldown-overlay"></div>
+          </div>
+          <div class="skill-card ready" onclick="if(window.MainGame && window.MainGame.currentLevel && window.MainGame.currentLevel.drone && window.MainGame.currentLevel.drone.recyclerCooldown<=0) window.MainGame.currentLevel.drone.triggerRecyclerBurst();" title="R or Scroll Down for Recycler Burst">
+            <span class="skill-key">R</span>
+            <span class="skill-icon">🌀</span>
+            <span class="skill-name">Recycler</span>
+            <div id="cdRecycler" class="cooldown-overlay"></div>
+          </div>
+
+          <div class="skill-card ready" onclick="if(window.MainGame && window.MainGame.currentLevel && window.MainGame.currentLevel.drone && window.MainGame.currentLevel.drone.swarmCooldown<=0) window.MainGame.currentLevel.drone.triggerHelperSwarm();" title="G or Key 3 to Deploy Helper Mini-Drones">
+            <span class="skill-key">G</span>
+            <span class="skill-icon">🤖</span>
+            <span class="skill-name">Swarm</span>
+            <div id="cdSwarm" class="cooldown-overlay"></div>
+          </div>
+          <div class="skill-card ready" onclick="window.MainGame.pauseGame()" title="Pause Game">
+            <span class="skill-key">ESC</span>
+            <span class="skill-icon">⏸️</span>
+            <span class="skill-name">Pause</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Mobile Virtual Touch Overlay -->
+    <div id="touch-controls">
+      <div id="touchStickZone" class="touch-stick-zone">
+        <div id="touchStickThumb" class="touch-stick-thumb"></div>
+      </div>
+      <div class="touch-actions-zone">
+        <button id="btnTouchBoost" class="touch-btn">🚀<br>BOOST</button>
+        <button id="btnTouchInteract" class="touch-btn">🔧<br>USE</button>
+        <button id="btnTouchSonar" class="touch-btn">📡<br>SONAR</button>
+        <button id="btnTouchRecycler" class="touch-btn">🌀<br>BURST</button>
+
+        <button id="btnTouchSwarm" class="touch-btn">🤖<br>SWARM</button>
+      </div>
+    </div>
+
+    <!-- Filter Alignment Mini-Game Overlay -->
+    <div id="minigame-container">
+      <div class="minigame-title">🔧 INSTALL BIO-FILTER</div>
+      <div class="minigame-desc">Align the molecular bio-membrane. Press <strong>[SPACE]</strong> or <strong>[E]</strong> or Tap inside the green zone!</div>
+      <div class="filter-bar-track">
+        <div id="filterSweetSpot" class="filter-sweet-spot"></div>
+        <div id="filterCursor" class="filter-cursor"></div>
+      </div>
+      <button class="btn btn-primary" onclick="window.UI.submitMinigame()">Lock Filter Clamp</button>
+    </div>
+
+    <!-- Level Up Celebration Pop-up -->
+    <div id="levelUpBanner" class="modal-overlay" style="background: rgba(0,0,0,0.7);">
+      <div class="modal-box" style="text-align:center; animation: pulse-pop 0.4s ease-out;">
+        <div style="font-size: 54px;">⚡👑⚡</div>
+        <h1 style="color:#ffd600; font-size:36px; text-transform:uppercase; letter-spacing:2px;">LEVEL UP!</h1>
+        <h2 style="color:var(--primary); margin:8px 0;">You Reached Level <span id="levelUpNum">2</span>!</h2>
+        <p style="color:var(--text-muted); font-size:14px;">New drone skins and bonuses have been unlocked in your Locker!</p>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="document.getElementById('levelUpBanner').style.display='none'">Awesome!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. TITLE SCREEN MODAL -->
+    <div id="modalTitle" class="modal-overlay">
+      <div class="modal-box wide title-container">
+        <div class="sdg-badge">🌍 UN SDG 6: Clean Water and Sanitation</div>
+        <h1 class="game-logo">AquaGuardian</h1>
+        <h3 style="color:var(--primary);letter-spacing:4px;font-weight:600;margin-top:-10px;">DEEP CLEAN</h3>
+        <p class="tagline">Pilot the solar-powered Aqua-Drone. Clear deadly plastics, neutralize toxic chemical barrels, install wastewater bio-filters, unlock epic skins, and heal living aquatic biomes.</p>
+
+        <!-- Mission Level Select Grid -->
+        <div style="width:100%;margin-top:10px;">
+          <h3 style="font-size:15px;color:var(--primary);margin-bottom:12px;text-align:left;">SELECT MISSION:</h3>
+          <div id="levelSelectGrid" class="level-grid"></div>
+        </div>
+
+        <!-- Primary Action Menu -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:14px;">
+          <button id="btnTitlePlay" class="btn btn-primary">▶ Continue Mission</button>
+          <button id="btnTitleTutorial" class="btn btn-eco">🎓 Cadet Training</button>
+          <button id="btnTitleLocker" class="btn btn-secondary">🎨 Drone Locker</button>
+          <button id="btnTitleShop" class="btn btn-secondary">🛒 Tech Upgrades</button>
+          <button id="btnTitleHowTo" class="btn btn-secondary">📖 How to Play</button>
+          <button id="btnTitleControls" class="btn btn-secondary">🎮 Controls</button>
+          <button id="btnTitleAchievements" class="btn btn-secondary">🏆 Badges</button>
+          <button id="btnTitleSettings" class="btn btn-secondary">⚙️ Settings</button>
+          <button id="btnTitleCredits" class="btn btn-secondary">ℹ️ Credits</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MISSION BRIEFING MODAL (Shows objectives before starting each level) -->
+    <div id="modalBriefing" class="modal-overlay">
+      <div class="modal-box wide">
+        <div style="display:flex; align-items:center; gap:16px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:14px;">
+          <div id="briefingIcon" style="font-size:44px; background: rgba(0,242,254,0.15); padding:10px 14px; border-radius:14px; border:1px solid var(--primary);">🏞️</div>
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span id="briefingWqiBadge" style="font-size:12px; font-weight:bold; background:rgba(0,230,118,0.2); color:#00e676; border:1px solid #00e676; padding:3px 10px; border-radius:12px;">TARGET: 80% WQI</span>
+              <span style="font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">TACTICAL BRIEFING</span>
+            </div>
+            <h2 id="briefingTitle" style="color:#fff; font-size:24px; margin-top:4px;">Mission 1: Crystal River</h2>
+            <div id="briefingSubtitle" style="color:var(--primary); font-size:13px; font-weight:600;">Freshwater Riverine Basin</div>
+          </div>
+        </div>
+
+        <!-- Primary Objectives -->
+        <div style="margin-top:10px;">
+          <h3 style="font-size:14px; color:#ffd600; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🎯 PRIMARY OBJECTIVES</h3>
+          <div id="briefingObjectives" style="display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,0.4); padding:12px 16px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+          </div>
+        </div>
+
+        <!-- Eco-Threat Intel (SDG 6) -->
+        <div>
+          <h3 style="font-size:14px; color:var(--primary); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">⚠️ ENVIRONMENTAL INTEL (UN SDG 6)</h3>
+          <p id="briefingIntel" style="font-size:13px; line-height:1.5; color:var(--text-main); background:rgba(0, 242, 254, 0.05); border:1px solid var(--card-border); padding:12px 16px; border-radius:12px;"></p>
+        </div>
+
+        <!-- Tactical Advice -->
+        <div>
+          <h3 style="font-size:13px; color:#69f0ae; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">💡 TACTICAL ADVICE</h3>
+          <p id="briefingTips" style="font-size:12px; color:var(--text-muted); font-style:italic; padding-left:4px;"></p>
+        </div>
+
+        <!-- Launch Button -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Back to Base</button>
+          <button id="btnLaunchMission" class="btn btn-primary pulse-btn" style="padding:14px 32px; font-size:16px;">🚀 LAUNCH MISSION ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. PAUSE MENU MODAL -->
+    <div id="modalPause" class="modal-overlay">
+      <div class="modal-box" style="text-align:center;">
+        <h2>Game Paused</h2>
+        <p style="color:var(--text-muted);">Take a breath. The river ecosystem awaits your stewardship.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px;">
+          <button id="btnPauseResume" class="btn btn-primary">▶ Resume Mission</button>
+          <button id="btnPauseLocker" class="btn btn-eco">🎨 Drone Locker</button>
+          <button id="btnPauseRestart" class="btn btn-secondary">🔄 Restart Level</button>
+          <button id="btnPauseSettings" class="btn btn-secondary">⚙️ Settings</button>
+          <button id="btnPauseTitle" class="btn btn-danger">🏠 Quit to Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. DRONE LOCKER / SKINS MODAL (Fortnite/Roblox style) -->
+    <div id="modalLocker" class="modal-overlay">
+      <div class="modal-box wide">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h2>🎨 Drone Locker & Skin Wraps</h2>
+            <p style="color:var(--text-muted);font-size:13px;">Customize your Aqua-Drone with custom paint finishes, glowing neons, and unique trail particle effects.</p>
+          </div>
+        </div>
+
+        <div id="lockerGrid" class="level-grid" style="margin-top:14px;"></div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Back to Base</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. UPGRADE SHOP MODAL -->
+    <div id="modalShop" class="modal-overlay">
+      <div class="modal-box wide">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h2>Aqua-Drone Tech Upgrades</h2>
+            <p style="color:var(--text-muted);font-size:13px;">Invest Eco-Credits from recycled debris into state-of-the-art environmental systems.</p>
+          </div>
+          <div style="font-size:20px;font-weight:bold;color:#ffd600;">
+            🪙 <span id="shopCredits">0</span> Credits
+          </div>
+        </div>
+
+        <div id="shopGrid" class="upgrade-grid"></div>
+
+        <div style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-close-modal">Back to Base</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. LEVEL REPORT CARD & MANDATORY QUIZ MODAL -->
+    <div id="modalReport" class="modal-overlay">
+      <div class="modal-box wide">
+        <div style="text-align:center;">
+          <div id="reportStars" style="font-size:32px;color:#ffd600;margin-bottom:6px;">⭐⭐⭐</div>
+          <h2 id="reportTitle">Ecosystem Restored!</h2>
+          <p style="color:var(--text-muted);font-size:14px;">Your intervention brought the Water Quality Index above the safe threshold.</p>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="report-stats">
+          <div class="stat-box">
+            <div class="title">Water Purified</div>
+            <div id="reportLiters" class="number">125,000 Liters</div>
+          </div>
+          <div class="stat-box">
+            <div class="title">Mission Score</div>
+            <div id="reportScore" class="number">4,250</div>
+          </div>
+          <div class="stat-box">
+            <div class="title">Plastic Collected</div>
+            <div id="reportDebris" class="number">32 Items</div>
+          </div>
+          <div class="stat-box">
+            <div class="title">Pipes Filtered & Barrels Neutralized</div>
+            <div id="reportPipes" class="number">4 Filters / 3 Barrels</div>
+          </div>
+          <div class="stat-box">
+            <div class="title">Final NSF-WQI Score</div>
+            <div id="reportWQI" class="number" style="color:var(--primary); font-size:18px;">88 / 100 [Good]</div>
+          </div>
+          <div class="stat-box">
+            <div class="title">Wildlife Preservation (Eco-Karma)</div>
+            <div id="reportKarma" class="number" style="color:var(--eco-green);">100%</div>
+          </div>
+        </div>
+
+        <!-- SDG 6 Mandatory Water Quiz Gate -->
+        <div class="quiz-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:bold;color:var(--primary);font-size:14px;">💧 MANDATORY SDG 6 WATER QUIZ</span>
+            <span style="font-size:12px;color:#ffd600;">Must answer correctly to unlock next level!</span>
+          </div>
+          <div id="reportQuizQuestion" style="font-size:14px;font-weight:600;">Loading water conservation question...</div>
+          <div id="reportQuizOptions" class="quiz-options"></div>
+          <div id="reportQuizFact" style="font-size:12px;font-style:italic;"></div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+          <button id="btnReportReplay" class="btn btn-secondary">🔄 Replay</button>
+          <button id="btnReportShop" class="btn btn-eco">🛒 Upgrades</button>
+          <button id="btnReportNext" class="btn btn-primary" disabled>🔒 Answer Quiz to Unlock</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. HOW TO PLAY MODAL -->
+    <div id="modalHowToPlay" class="modal-overlay">
+      <div class="modal-box wide">
+        <h2>How to Play AquaGuardian</h2>
+        <p style="color:var(--text-muted);">Protecting our global waterways through advanced autonomous eco-technology.</p>
+
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:14px;">
+          <div>
+            <strong style="color:var(--primary);">1. Collect & Recycle Debris</strong><br>
+            Drive over floating bottles, bags, and nets. Return to a <strong>Recycling Buoy</strong> (yellow beacon) to offload cargo for Eco-Credits, XP, and WQI points.
+          </div>
+          <div>
+            <strong style="color:var(--primary);">2. Hydro-Drift for Mini-Turbos</strong><br>
+            Turn sharply while at high speed to hydro-drift with water sparks! Hold the drift for over 1.2 seconds to release a powerful <strong>Mini-Turbo Boost</strong>.
+          </div>
+          <div>
+            <strong style="color:var(--primary);">3. Mystery Supply Drops & Power-ups</strong><br>
+            Look for floating golden Supply Crates! Smash them to trigger confetti jackpots, granting Overcharge Turbo, Giant Magnet Vortexes, and Invincibility Shields.
+          </div>
+          <div>
+            <strong style="color:var(--primary);">4. Neutralize Toxic Barrels & Install Bio-Filters</strong><br>
+            Hold <strong>[E]</strong> near leaking barrels to tractor-neutralize them. Approach storm sewer pipes and time the bio-filter clamp inside the green zone!
+          </div>
+          <div>
+            <strong style="color:var(--primary);">5. Mandatory Learning Quizzes</strong><br>
+            To advance across the campaign, you must master the SDG 6 educational quiz at the end of each level!
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+          <button class="btn btn-secondary btn-close-modal">Got it!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. CONTROLS SCREEN MODAL -->
+    <div id="modalControls" class="modal-overlay">
+      <div class="modal-box">
+        <h2>Control Scheme</h2>
+        <p style="color:var(--text-muted);">Multi-input support: Keyboard, Gamepad, and Virtual Touchscreen.</p>
+
+        <div class="keys-grid" style="margin:16px 0;">
+          <div class="key-item"><span class="kbd">🖱️ Cursor</span> <span>Spaceship Follows Cursor Directly</span></div>
+          <div class="key-item"><span class="kbd">Left Click / Space</span> <span>Hydro-Boost Engine</span></div>
+
+          <div class="key-item"><span class="kbd">Auto-Hover / E</span> <span>Neutralize Barrels & Bio-Filter</span></div>
+          <div class="key-item"><span class="kbd">Q / Scroll Up / 1</span> <span>Sonar Ping Radar</span></div>
+          <div class="key-item"><span class="kbd">R / Scroll Down / 2</span> <span>Recycler Burst Shockwave</span></div>
+          <div class="key-item"><span class="kbd">G / Key 3</span> <span>Deploy Autonomous Helper Mini-Drones</span></div>
+          <div class="key-item"><span class="kbd">WASD / Arrows</span> <span>Optional Classic Keyboard Steering</span></div>
+          <div class="key-item"><span class="kbd">P / Esc</span> <span>Pause / Resume</span></div>
+        </div>
+
+        <div style="font-size:12px;color:var(--text-muted);border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+          🎮 <strong>Gamepad:</strong> Left Stick = Steer & Drift | A = Boost | X = Interact | Y = Sonar | B = Recycler | Start = Pause
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. ACHIEVEMENTS MODAL -->
+    <div id="modalAchievements" class="modal-overlay">
+      <div class="modal-box wide">
+        <h2>Eco-Guardian Badges</h2>
+        <p style="color:var(--text-muted);">Special milestones demonstrating master-class water stewardship.</p>
+        <div id="achievementsList" class="level-grid" style="margin-top:14px;"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. SETTINGS MODAL -->
+    <div id="modalSettings" class="modal-overlay">
+      <div class="modal-box">
+        <h2>Audio & Accessibility Settings</h2>
+        <p style="color:var(--text-muted);">Customize difficulty, accessibility palettes, and performance.</p>
+
+        <div class="settings-group">
+          <div class="setting-row">
+            <label for="settingDifficulty">Difficulty Mode</label>
+            <select id="settingDifficulty">
+              <option value="chill">Chill (Low drain, relaxed hazards)</option>
+              <option value="normal" selected>Normal (Standard balance)</option>
+              <option value="hardcore">Hardcore (Fast leaks, aggressive drain)</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="settingColorblind">Colorblind Vision Palette</label>
+            <select id="settingColorblind">
+              <option value="none" selected>Standard RGB</option>
+              <option value="protanopia">Protanopia (Red-weak)</option>
+              <option value="deuteranopia">Deuteranopia (Green-weak)</option>
+              <option value="tritanopia">Tritanopia (Blue-weak)</option>
+              <option value="highcontrast">High-Contrast Mode</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="settingSfx">Sound Effects Volume</label>
+            <input type="range" id="settingSfx" min="0" max="1" step="0.05" value="0.8">
+          </div>
+          <div class="setting-row">
+            <label for="settingMusic">Generative Music Volume</label>
+            <input type="range" id="settingMusic" min="0" max="1" step="0.05" value="0.5">
+          </div>
+          <div class="setting-row">
+            <label for="settingMute">Mute All Audio</label>
+            <input type="checkbox" id="settingMute">
+          </div>
+          <div class="setting-row">
+            <label for="settingMotion">Reduce Motion (Disable Screen Shake)</label>
+            <input type="checkbox" id="settingMotion">
+          </div>
+          <div class="setting-row">
+            <label for="settingControlMode">Flight Control Scheme</label>
+            <select id="settingControlMode">
+              <option value="cursor_lock" selected>🖱️ Direct Cursor Lock (Spaceship IS Cursor)</option>
+              <option value="cursor_seek">🎯 Smooth Cursor Thruster Seek</option>
+              <option value="keyboard_only">⌨️ Classic Keyboard Only (WASD / Arrows)</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="settingTouch">Touch Controls Overlay</label>
+            <select id="settingTouch">
+              <option value="auto" selected>Auto-detect</option>
+              <option value="always">Always Show</option>
+              <option value="off">Always Hide</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="settingSpeed">Game Speed</label>
+            <select id="settingSpeed">
+              <option value="0.75">0.75x (Relaxed Pace)</option>
+              <option value="1.0" selected>1.0x (Standard)</option>
+              <option value="1.25">1.25x (Accelerated)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Save & Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. CREDITS MODAL -->
+    <div id="modalCredits" class="modal-overlay">
+      <div class="modal-box">
+        <h2>Project Credits</h2>
+        <div style="font-size:14px;line-height:1.6;color:var(--text-main);margin-top:10px;">
+          <p><strong>AquaGuardian: Deep Clean</strong></p>
+          <p style="color:var(--text-muted);">Built for <strong>C://hacks 2026</strong>, Chirec International School<br>Track: <strong>Game Development (Advanced Level)</strong></p>
+          <div style="margin:12px 0;padding:10px;background:rgba(255,255,255,0.05);border-radius:10px;">
+            <p><strong>🎯 Theme Focus:</strong> UN SDG 6 — Clean Water and Sanitation</p>
+            <p><strong>⚙️ Engine:</strong> Custom Vanilla HTML5 2D Canvas + WebAudio API (Zero external assets/libraries)</p>
+            <p><strong>🎨 Art & Audio:</strong> 100% Procedurally generated vector graphics, boids flocking, and synthetic dynamic soundscapes</p>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);">Designed, coded, and tested for C://hacks 2026 to raise awareness for UN Sustainable Development Goal 6.</p>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-secondary btn-close-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11. GAME OVER MODAL -->
+    <div id="modalGameOver" class="modal-overlay">
+      <div class="modal-box" style="text-align:center;">
+        <h2 style="color:var(--toxic-red);">Ecosystem Collapsed</h2>
+        <p id="gameOverReason" style="color:var(--text-muted);margin:10px 0;">The water quality fell to 0%.</p>
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:14px;">
+          <button id="btnGameOverRetry" class="btn btn-primary">🔄 Try Again</button>
+          <button id="btnGameOverMenu" class="btn btn-secondary">🏠 Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12. VICTORY / CAMPAIGN COMPLETE MODAL -->
+    <div id="modalVictory" class="modal-overlay">
+      <div class="modal-box wide" style="text-align:center;">
+        <div style="font-size:48px;">🌊✨🐬</div>
+        <h1 style="color:var(--eco-green);font-size:32px;">GLOBAL WATERWAYS RESTORED!</h1>
+        <p style="color:var(--text-main);font-size:16px;max-width:520px;margin:12px auto;">
+          The Sludge Leviathan has been purified into the guardian water spirit. Untreated municipal wastewater has been filtered, toxic barrels sealed, and marine life flourishes once more!
+        </p>
+        <div style="background:rgba(0,230,118,0.1);border:1px solid var(--eco-green);padding:14px;border-radius:14px;margin:16px 0;text-align:left;font-size:13px;">
+          <strong>Impact Summary:</strong><br>
+          • 100% of municipal drainage pipes retrofitted with bio-filtration.<br>
+          • Over 500,000 liters of contaminated wastewater purged.<br>
+          • Full adherence to UN SDG 6: Clean Water and Sanitation.
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <button id="btnVictoryMenu" class="btn btn-primary">🏠 Return to Main Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/upgrades.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
